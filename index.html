@@ -38,12 +38,12 @@
       { name: "C", latitude: 17.43586977362672, longitude: 78.45345717606331,  audio: "TEST03.mp3" }
       // Add more target locations as needed
     ];
-    let proximityThreshold = 0.05; // Threshold in kilometers (50 meters)
+    let proximityThreshold = 0.2; // Threshold in kilometers (200 meters)
     let audioPlayed = false; // Flag to track if audio has been played
     let audio = document.getElementById("audioPlayer");
 
     // Initialize Leaflet map
-    var map = L.map('map').setView([0, 0], 12); // Default center and zoom level
+    var map = L.map('map').setView([0, 0], 15); // Default center and zoom level
 
     // Add a tile layer from OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
