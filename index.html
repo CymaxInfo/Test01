@@ -33,9 +33,9 @@
     // Variables
     let watchId = null; // Variable to hold the watch position ID
     let targetLocations = [
-      { name: "A", latitude: 17.4383581999999997,   longitude:78.4638163000000048, audio: "TEST02.mp3" },
+      { name: "A", latitude:17.4335999999999984,   longitude:78.4493999999999971, audio: "rocking_alaram.mp3" },
       { name: "B", latitude: 17.42920742246082, longitude: 78.45539066206804, audio: "TEST02.mp3" },
-      { name: "C", latitude: 17.43586977362672, longitude: 78.4493999999999971, audio: "TEST03.mp3" }
+      { name: "C", latitude: 17.43586977362672, longitude: 78.4493999999999971, audio: "TEST02.mp3" }
       // Add more target locations as needed
     ];
     let proximityThreshold = 0.004; // Threshold in kilometers (50 meters)
@@ -92,124 +92,68 @@
 
     // Function to get current position
     function getCurrentPosition() {
-      navigator.geolocation.getCurrentPosition(
-        function(position) {
-          var currentLat = position.coords.latitude;
-          var currentLng = position.coords.longitude;
+  navigator.geolocation.getCurrentPosition(
+    function(position) {
+      var currentLat = position.coords.latitude;
+      var currentLng = position.coords.longitude;
 
-          // Set the map's view to the current location and zoom level
-          map.setView([currentLat, currentLng], 25);
+      // Set the map's view to the current location and zoom level
+      map.setView([currentLat, currentLng], 25);
 
-          // Initialize marker if not already initialized
-          if (marker === null) {
-            marker = L.marker([currentLat, currentLng]).addTo(map);
-          } else {
-            marker.setLatLng([currentLat, currentLng]);
-          }
+      // Initialize marker if not already initialized
+      if (marker === null) {
+        marker = L.marker([currentLat, currentLng]).addTo(map);
+      } else {
+        marker.setLatLng([currentLat, currentLng]);
+      }
 
-          // Loop through each target location
-          targetLocations.forEach(location => {
-            // Add circle for proximity threshold
-            L.circle([location.latitude, location.longitude], {
-              color: 'red',
-              fillColor: '#f03',
-              fillOpacity: 0.5,
-              radius: proximityThreshold * 1000 // Convert kilometers to meters
-            }).addTo(map);
+      // Loop through each target location
+      targetLocations.forEach(location => {
+        // Add circle for proximity threshold
+        L.circle([location.latitude, location.longitude], {
+          color: 'red',
+          fillColor: '#f03',
+          fillOpacity: 0.5,
+          radius: proximityThreshold * 1000 // Convert kilometers to meters
+        }).addTo(map);
 
-            // Calculate distance to target location
-            let distance = calculateDistance(currentLat, currentLng, location.latitude, location.longitude);
+        // Calculate distance to target location
+        let distance = calculateDistance(currentLat, currentLng, location.latitude, location.longitude);
 
-            // Display initial distance information
-            displayDistance(location, distance);
+        // Display initial distance information
+        displayDistance(location, distance);
 
-            // Draw route (polyline) from current location to target location
-            calculateRoute(currentLat, currentLng, location.latitude, location.longitude, function(route) {
-              let pathway = L.polyline(route, { color: 'blue' }).addTo(map);
-              pathways.push(pathway);
-            });
-          });
+        // Draw route (polyline) from current location to target location
+        calculateRoute(currentLat, currentLng, location.latitude, location.longitude, function(route) {
+          let pathway = L.polyline(route, { color: 'blue' }).addTo(map);
+          pathways.push(pathway);
+        });
 
-          // Update latitude and longitude elements with current position
-          document.getElementById("latitude").textContent = currentLat.toFixed(16);
-          document.getElementById("longitude").textContent = currentLng.toFixed(16);
-
-          // Start watching for position changes
-          watchId = navigator.geolocation.watchPosition(
-            function(position) {
-              // Update latitude and longitude elements with updated position
-              var updatedLat = position.coords.latitude;
-              var updatedLng = position.coords.longitude;
-              document.getElementById("latitude").textContent = updatedLat.toFixed(16);
-              document.getElementById("longitude").textContent = updatedLng.toFixed(16);
-
-              // Update marker position
-              marker.setLatLng([updatedLat, updatedLng]);
-
-              // Check proximity to each target location
-              let closeToTarget = false;
-              targetLocations.forEach((location, index) => {
-                let distance = calculateDistance(updatedLat, updatedLng, location.latitude, location.longitude);
-
-                // If within tolerance radius of any target location and audio not yet played, play audio
-                if (!audioPlayed[location.name] && distance <= toleranceRadius) {
-                  playAudio(location.audio);
-                  audioPlayed[location.name] = true; // Mark audio as played for this location
-                  closeToTarget = true; // Set flag that user is close to a target location
-                } else if (distance > toleranceRadius) {
-                  // Reset audioPlayed flag when moving away from all target locations
-                  audioPlayed[location.name] = false;
-                  stopAudio(); // Stop audio if currently playing
-                }
-
-                // Display updated distance information
-                displayDistance(location, distance);
-
-                // Update route (polyline) to reflect current location
-                calculateRoute(updatedLat, updatedLng, location.latitude, location.longitude, function(route) {
-                  if (index === 0) {
-                    // Update the traveled path for the first target location
-                    if (traveledPath) {
-                      map.removeLayer(traveledPath);
-                    }
-                    traveledPath = L.polyline(route, { color: 'green' }).addTo(map);
-                  } else {
-                    // Update the route to the target location if pathway exists
-                    let pathway = pathways[index];
-                    if (pathway) {
-                      pathway.setLatLngs(route);
-                    } else {
-                      console.error(`Pathway at index ${index} is undefined.`);
-                    }
-                  }
-                });
-              });
-
-              // If not close to any target location, reset audio and flag
-              if (!closeToTarget) {
-                stopAudio();
-              }
-            },
-            function(error) {
-              console.error("Error getting geolocation:", error.message);
-            },
-            {
-              enableHighAccuracy: true,
-              maximumAge: 0,
-              timeout: 10000
-            }
-          );
-        },
-        function(error) {
-          console.error("Error getting current geolocation:", error.message);
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 10000
+        // Check proximity to target location
+        if (distance <= toleranceRadius && !audioPlayed[location.name]) {
+          playAudio(location.audio);
+          audioPlayed[location.name] = true; // Mark audio as played for this location
         }
-      );
+      });
+
+      // Update latitude and longitude elements with current position
+      document.getElementById("latitude").textContent = currentLat.toFixed(16);
+      document.getElementById("longitude").textContent = currentLng.toFixed(16);
+
+      // Start watching for position changes
+      watchId = navigator.geolocation.watchPosition(/* ... */);
+    },
+    function(error) {
+      console.error("Error getting current geolocation:", error.message);
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000
     }
+  );
+}
+
 
     // Function to calculate distance between two points (Haversine formula)
     function calculateDistance(lat1, lon1, lat2, lon2) {
