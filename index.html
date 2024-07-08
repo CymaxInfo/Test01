@@ -33,8 +33,8 @@
     // Variables
     let watchId = null; // Variable to hold the watch position ID
     let targetLocations = [
-      { name: "Cymax Infotainment Pvt Ltd", latitude:17.430730918509482,  longitude: 78.45548093014318,  audio: "TEST01.mp3" },
-      { name: "B", latitude: 17.43063973569388,  longitude:78.45541476700039,audio: "TEST02.mp3" },
+      { name: "A", latitude:17.430730918509482,  longitude: 78.45548093014318,  audio: "TEST01.mp3" },
+      { name: "B", latitude: 17.42920742246082, longitude: 78.45539066206804, audio: "TEST02.mp3" },
       { name: "C", latitude: 17.43586977362672, longitude: 78.45345717606331,  audio: "TEST03.mp3" }
       // Add more target locations as needed
     ];
@@ -97,7 +97,7 @@
           var currentLng = position.coords.longitude;
 
           // Set the map's view to the current location and zoom level
-          map.setView([currentLat, currentLng], 25);
+          map.setView([currentLat, currentLng], 15);
 
           // Initialize marker if not already initialized
           if (marker === null) {
@@ -116,6 +116,10 @@
               radius: proximityThreshold * 1000 // Convert kilometers to meters
             }).addTo(map);
 
+            // Add marker for each target location
+            let targetMarker = L.marker([location.latitude, location.longitude]).addTo(map);
+            targetMarker.bindPopup(`<b>${location.name}</b>`).openPopup();
+
             // Calculate distance to target location
             let distance = calculateDistance(currentLat, currentLng, location.latitude, location.longitude);
 
@@ -130,8 +134,8 @@
           });
 
           // Update latitude and longitude elements with current position
-          document.getElementById("latitude").textContent = currentLat.toFixed(16);
-          document.getElementById("longitude").textContent = currentLng.toFixed(16);
+          document.getElementById("latitude").textContent = currentLat.toFixed(6);
+          document.getElementById("longitude").textContent = currentLng.toFixed(6);
 
           // Start watching for position changes
           watchId = navigator.geolocation.watchPosition(
@@ -139,8 +143,8 @@
               // Update latitude and longitude elements with updated position
               var updatedLat = position.coords.latitude;
               var updatedLng = position.coords.longitude;
-              document.getElementById("latitude").textContent = updatedLat.toFixed(16);
-              document.getElementById("longitude").textContent = updatedLng.toFixed(16);
+              document.getElementById("latitude").textContent = updatedLat.toFixed(6);
+              document.getElementById("longitude").textContent = updatedLng.toFixed(6);
 
               // Update marker position
               marker.setLatLng([updatedLat, updatedLng]);
@@ -248,24 +252,22 @@
     }
 
     // Function to play audio
-  // Function to play audio
-function playAudio(audioSrc) {
-  audio.src = audioSrc;
-  
-  // Check if the audio can be played (browser-specific requirement)
-  let playPromise = audio.play();
-  
-  if (playPromise !== undefined) {
-    playPromise.then(_ => {
-      // Automatic playback started!
-      console.log('Audio playback started.');
-    }).catch(error => {
-      // Auto-play was prevented
-      console.error('Auto-play prevented. Please interact with the page to play audio:', error);
-    });
-  }
-}
-
+    function playAudio(audioSrc) {
+      audio.src = audioSrc;
+      
+      // Check if the audio can be played (browser-specific requirement)
+      let playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise.then(_ => {
+          // Automatic playback started!
+          console.log('Audio playback started.');
+        }).catch(error => {
+          // Auto-play was prevented
+          console.error('Auto-play prevented. Please interact with the page to play audio:', error);
+        });
+      }
+    }
 
     // Function to stop audio
     function stopAudio() {
