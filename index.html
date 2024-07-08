@@ -91,7 +91,7 @@
     }
 
     // Function to get current position
-    function getCurrentPosition() {
+function getCurrentPosition() {
   navigator.geolocation.getCurrentPosition(
     function(position) {
       var currentLat = position.coords.latitude;
@@ -109,31 +109,26 @@
 
       // Loop through each target location
       targetLocations.forEach(location => {
-        // Add circle for proximity threshold
-        L.circle([location.latitude, location.longitude], {
-          color: 'red',
-          fillColor: '#f03',
-          fillOpacity: 0.5,
-          radius: proximityThreshold * 1000 // Convert kilometers to meters
-        }).addTo(map);
-
         // Calculate distance to target location
         let distance = calculateDistance(currentLat, currentLng, location.latitude, location.longitude);
 
         // Display initial distance information
         displayDistance(location, distance);
 
+        // Check proximity to target location
+        if (distance <= toleranceRadius && !audioPlayed[location.name]) {
+          playAudio(location.audio);
+          audioPlayed[location.name] = true; // Mark audio as played for this location
+        } else if (distance > toleranceRadius && audioPlayed[location.name]) {
+          // Reset audio played flag if user moves away
+          audioPlayed[location.name] = false;
+        }
+
         // Draw route (polyline) from current location to target location
         calculateRoute(currentLat, currentLng, location.latitude, location.longitude, function(route) {
           let pathway = L.polyline(route, { color: 'blue' }).addTo(map);
           pathways.push(pathway);
         });
-
-        // Check proximity to target location
-        if (distance <= toleranceRadius && !audioPlayed[location.name]) {
-          playAudio(location.audio);
-          audioPlayed[location.name] = true; // Mark audio as played for this location
-        }
       });
 
       // Update latitude and longitude elements with current position
@@ -141,7 +136,60 @@
       document.getElementById("longitude").textContent = currentLng.toFixed(16);
 
       // Start watching for position changes
-      watchId = navigator.geolocation.watchPosition(/* ... */);
+      watchId = navigator.geolocation.watchPosition(
+        function(position) {
+          // Update latitude and longitude elements with updated position
+          var updatedLat = position.coords.latitude;
+          var updatedLng = position.coords.longitude;
+          document.getElementById("latitude").textContent = updatedLat.toFixed(16);
+          document.getElementById("longitude").textContent = updatedLng.toFixed(16);
+
+          // Update marker position
+          marker.setLatLng([updatedLat, updatedLng]);
+
+          // Check proximity to each target location
+          targetLocations.forEach((location) => {
+            let distance = calculateDistance(updatedLat, updatedLng, location.latitude, location.longitude);
+
+            // If within tolerance radius of any target location and audio not yet played, play audio
+            if (!audioPlayed[location.name] && distance <= toleranceRadius) {
+              playAudio(location.audio);
+              audioPlayed[location.name] = true; // Mark audio as played for this location
+            } else if (distance > toleranceRadius) {
+              // Reset audioPlayed flag when moving away from all target locations
+              audioPlayed[location.name] = false;
+              stopAudio(); // Stop audio if currently playing
+            }
+
+            // Display updated distance information
+            displayDistance(location, distance);
+
+            // Update route (polyline) to reflect current location
+            calculateRoute(updatedLat, updatedLng, location.latitude, location.longitude, function(route) {
+              // Update the route to the target location if pathway exists
+              let pathway = pathways.find(path => path._latlngs[0].lat === location.latitude && path._latlngs[0].lng === location.longitude);
+              if (pathway) {
+                pathway.setLatLngs(route);
+              } else {
+                console.error(`Pathway for ${location.name} not found.`);
+              }
+            });
+          });
+
+          // If not close to any target location, reset audio and flag
+          if (!Object.values(audioPlayed).includes(true)) {
+            stopAudio();
+          }
+        },
+        function(error) {
+          console.error("Error getting geolocation:", error.message);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 10000
+        }
+      );
     },
     function(error) {
       console.error("Error getting current geolocation:", error.message);
@@ -153,6 +201,7 @@
     }
   );
 }
+
 
 
     // Function to calculate distance between two points (Haversine formula)
