@@ -33,17 +33,18 @@
     // Variables
     let watchId = null; // Variable to hold the watch position ID
     let targetLocations = [
-      { name: "A", latitude:17.430730918509482,  longitude: 78.45548093014318,  audio: "TEST01.mp3" },
+      { name: "A", latitude: 17.4383581999999997,  longitude: 78.4638163000000048, audio: "TEST02.mp3" },
       { name: "B", latitude: 17.42920742246082, longitude: 78.45539066206804, audio: "TEST02.mp3" },
-      { name: "C", latitude: 17.43586977362672, longitude: 78.45345717606331,  audio: "TEST03.mp3" }
+      { name: "C", latitude: 17.43586977362672, longitude: 78.4493999999999971, audio: "TEST02.mp3" }
       // Add more target locations as needed
     ];
-    let proximityThreshold = 0.02; // Threshold in kilometers (200 meters)
-    let audioPlayed = false; // Flag to track if audio has been played
+    let proximityThreshold = 0.05; // Threshold in kilometers (50 meters)
+    let audioPlayed = {}; // Object to track if audio has been played for each location
     let audio = document.getElementById("audioPlayer");
+    let toleranceRadius = 0.1; // Tolerance radius in kilometers (100 meters)
 
     // Initialize Leaflet map
-    var map = L.map('map').setView([0, 0], 15); // Default center and zoom level
+    var map = L.map('map').setView([0, 0], 12); // Default center and zoom level
 
     // Add a tile layer from OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -97,7 +98,7 @@
           var currentLng = position.coords.longitude;
 
           // Set the map's view to the current location and zoom level
-          map.setView([currentLat, currentLng], 15);
+          map.setView([currentLat, currentLng], 25);
 
           // Initialize marker if not already initialized
           if (marker === null) {
@@ -116,10 +117,6 @@
               radius: proximityThreshold * 1000 // Convert kilometers to meters
             }).addTo(map);
 
-            // Add marker for each target location
-            let targetMarker = L.marker([location.latitude, location.longitude]).addTo(map);
-            targetMarker.bindPopup(`<b>${location.name}</b>`).openPopup();
-
             // Calculate distance to target location
             let distance = calculateDistance(currentLat, currentLng, location.latitude, location.longitude);
 
@@ -134,8 +131,8 @@
           });
 
           // Update latitude and longitude elements with current position
-          document.getElementById("latitude").textContent = currentLat.toFixed(6);
-          document.getElementById("longitude").textContent = currentLng.toFixed(6);
+          document.getElementById("latitude").textContent = currentLat.toFixed(16);
+          document.getElementById("longitude").textContent = currentLng.toFixed(16);
 
           // Start watching for position changes
           watchId = navigator.geolocation.watchPosition(
@@ -143,22 +140,25 @@
               // Update latitude and longitude elements with updated position
               var updatedLat = position.coords.latitude;
               var updatedLng = position.coords.longitude;
-              document.getElementById("latitude").textContent = updatedLat.toFixed(6);
-              document.getElementById("longitude").textContent = updatedLng.toFixed(6);
+              document.getElementById("latitude").textContent = updatedLat.toFixed(16);
+              document.getElementById("longitude").textContent = updatedLng.toFixed(16);
 
               // Update marker position
               marker.setLatLng([updatedLat, updatedLng]);
 
               // Check proximity to each target location
+              let closeToTarget = false;
               targetLocations.forEach((location, index) => {
                 let distance = calculateDistance(updatedLat, updatedLng, location.latitude, location.longitude);
 
-                // If within proximity and audio not yet played, play audio
-                if (!audioPlayed && distance <= proximityThreshold) {
+                // If within tolerance radius of any target location and audio not yet played, play audio
+                if (!audioPlayed[location.name] && distance <= toleranceRadius) {
                   playAudio(location.audio);
-                  audioPlayed = true;
-                } else if (distance > proximityThreshold) {
-                  audioPlayed = false; // Reset audioPlayed flag when moving away
+                  audioPlayed[location.name] = true; // Mark audio as played for this location
+                  closeToTarget = true; // Set flag that user is close to a target location
+                } else if (distance > toleranceRadius) {
+                  // Reset audioPlayed flag when moving away from all target locations
+                  audioPlayed[location.name] = false;
                   stopAudio(); // Stop audio if currently playing
                 }
 
@@ -174,12 +174,21 @@
                     }
                     traveledPath = L.polyline(route, { color: 'green' }).addTo(map);
                   } else {
-                    // Update the route to the target location
+                    // Update the route to the target location if pathway exists
                     let pathway = pathways[index];
-                    pathway.setLatLngs(route);
+                    if (pathway) {
+                      pathway.setLatLngs(route);
+                    } else {
+                      console.error(`Pathway at index ${index} is undefined.`);
+                    }
                   }
                 });
               });
+
+              // If not close to any target location, reset audio and flag
+              if (!closeToTarget) {
+                stopAudio();
+              }
             },
             function(error) {
               console.error("Error getting geolocation:", error.message);
@@ -223,7 +232,7 @@
     // Function to calculate route between two points
     function calculateRoute(startLat, startLng, endLat, endLng, callback) {
       // Using OpenRouteService API to calculate route
-      let url = `https://api.openrouteservice.org/v2/directions/driving-car?start=${startLng},${startLat}&end=${endLng},${endLat}&api_key=5b3ce3597851110001cf62489bf0b47e625d4a7ca265bbaf18c24a31`;
+      let url = `https://api.openrouteservice.org/v2/directions/driving-car?start=${startLng},${startLat}&end=${endLng},${endLat}&api_key=YOUR_API_KEY`; // Replace with your API key
 
       fetch(url)
         .then(response => response.json())
@@ -248,25 +257,19 @@
       }
 
       // Update the distance text for this location
-      locationDistanceSpan.innerHTML = `${location.name} is ${distance.toFixed(2)} km far from your current location.<br>`;
+      locationDistanceSpan.innerHTML = `${location.name} is ${distance.toFixed(2)} km from your current location.<br>`;
     }
 
     // Function to play audio
     function playAudio(audioSrc) {
       audio.src = audioSrc;
-      
-      // Check if the audio can be played (browser-specific requirement)
-      let playPromise = audio.play();
-      
-      if (playPromise !== undefined) {
-        playPromise.then(_ => {
-          // Automatic playback started!
-          console.log('Audio playback started.');
-        }).catch(error => {
-          // Auto-play was prevented
-          console.error('Auto-play prevented. Please interact with the page to play audio:', error);
-        });
-      }
+      audio.play().then(() => {
+        // Playback started successfully
+        console.log('Audio playback started.');
+      }).catch(error => {
+        // Handle any errors that occur during playback
+        console.error('Failed to play audio:', error.message);
+      });
     }
 
     // Function to stop audio
@@ -289,7 +292,7 @@
         document.getElementById("longitude").textContent = "";
         // Clear distance information
         document.getElementById("distanceInfo").innerHTML = "";
-        audioPlayed = false; // Reset audio played flag
+        audioPlayed = {}; // Reset audio played flags
         stopAudio(); // Stop audio playback
         watchId = null; // Reset watchId
         // Remove marker from map
