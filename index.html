@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geolocation Tracking with Leaflet Map</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Leaflet JavaScript -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Your custom CSS -->
+  <style>
+    #map {
+      height: 400px; /* Adjust height as needed */
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <p>Current Latitude: <span id="latitude"></span></p>
+  <p>Current Longitude: <span id="longitude"></span></p>
+  <div id="distanceInfo"></div> <!-- To display distance information -->
+
+  <button id="startTrackingBtn">Start Tracking</button>
+  <button id="stopTrackingBtn">Stop Tracking</button>
+
+  <!-- Hidden audio player for playing sounds -->
+  <audio id="audioPlayer" controls style="display: none;">
+    Your browser does not support the audio element.
+  </audio>
+
+  <script>
+    // Variables
+    let watchId = null; // Variable to hold the watch position ID
+    let targetLocations = [
+      { name: "A", latitude: 17.430652848129057,  longitude: 78.45563205973157, audio: "TEST01.mp3" },
+      { name: "B", latitude: 17.42920742246082, longitude: 78.45539066206804, audio: "TEST02.mp3" },
+      { name: "C", latitude: 17.43397925537426, longitude: 78.44867913520096, audio: "TEST01.mp3" }
+      // Add more target locations as needed
+    ];
+    let proximityThreshold = 0.02; // Threshold in kilometers (20 meters)
+    let audioPlayed = false; // Flag to track if audio has been played
+    let audio = document.getElementById("audioPlayer");
+
+    // Initialize Leaflet map
+    var map = L.map('map').setView([0, 0], 12); // Default center and zoom level
+
+    // Add a tile layer from OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Marker variable
+    let marker = null;
+    let pathways = []; // Array to store pathways (polylines)
+
+    // Function to initialize the map centered on the user's current location
+    function initializeMap() {
+      // Check if geolocation is available
+      if ("geolocation" in navigator) {
+        // Ask for permission to use geolocation
+        navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+          if (result.state === 'granted') {
+            // Permission already granted, proceed to getCurrentPosition
+            getCurrentPosition();
+          } else if (result.state === 'prompt') {
+            // Permission not yet granted, ask for permission
+            navigator.geolocation.getCurrentPosition(
+              function(position) {
+                getCurrentPosition();
+              },
+              function(error) {
+                console.error("Error getting current geolocation:", error.message);
+              },
+              {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
+              }
+            );
+          } else {
+            // Permission denied or other state, handle appropriately
+            console.log('Geolocation permission denied.');
+          }
+        });
+      } else {
+        console.log("Geolocation is not supported by this browser.");
+      }
+    }
+
+    // Function to get current position
+    function getCurrentPosition() {
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          var currentLat = position.coords.latitude;
+          var currentLng = position.coords.longitude;
+
+          // Set the map's view to the current location and zoom level
+          map.setView([currentLat, currentLng], 25);
+
+          // Initialize marker if not already initialized
+          if (marker === null) {
+            marker = L.marker([currentLat, currentLng]).addTo(map);
+          } else {
+            marker.setLatLng([currentLat, currentLng]);
+          }
+
+          // Loop through each target location
+          targetLocations.forEach(location => {
+            // Add circle for proximity threshold
+            L.circle([location.latitude, location.longitude], {
+              color: 'red',
+              fillColor: '#f03',
+              fillOpacity: 0.5,
+              radius: proximityThreshold * 1000 // Convert kilometers to meters
+            }).addTo(map);
+
+            // Calculate distance to target location
+            let distance = calculateDistance(currentLat, currentLng, location.latitude, location.longitude);
+
+            // Display initial distance information
+            displayDistance(location, distance);
+
+            // Draw pathway (polyline) from current location to target location
+            let pathway = L.polyline([[currentLat, currentLng], [location.latitude, location.longitude]], { color: 'blue' }).addTo(map);
+            pathways.push(pathway);
+          });
+
+          // Update latitude and longitude elements with current position
+          document.getElementById("latitude").textContent = currentLat.toFixed(16);
+          document.getElementById("longitude").textContent = currentLng.toFixed(16);
+
+          // Start watching for position changes
+          watchId = navigator.geolocation.watchPosition(
+            function(position) {
+              // Update latitude and longitude elements with updated position
+              var updatedLat = position.coords.latitude;
+              var updatedLng = position.coords.longitude;
+              document.getElementById("latitude").textContent = updatedLat.toFixed(16);
+              document.getElementById("longitude").textContent = updatedLng.toFixed(16);
+
+              // Update marker position
+              marker.setLatLng([updatedLat, updatedLng]);
+
+              // Check proximity to each target location
+              targetLocations.forEach((location, index) => {
+                let distance = calculateDistance(updatedLat, updatedLng, location.latitude, location.longitude);
+
+                // If within proximity and audio not yet played, play audio
+                if (!audioPlayed && distance <= proximityThreshold) {
+                  playAudio(location.audio);
+                  audioPlayed = true;
+                } else if (distance > proximityThreshold) {
+                  audioPlayed = false; // Reset audioPlayed flag when moving away
+                  stopAudio(); // Stop audio if currently playing
+                }
+
+                // Display updated distance information
+                displayDistance(location, distance);
+
+                // Update pathway (polyline) to reflect current location
+                let pathway = pathways[index];
+                pathway.setLatLngs([[updatedLat, updatedLng], [location.latitude, location.longitude]]);
+              });
+            },
+            function(error) {
+              console.error("Error getting geolocation:", error.message);
+            },
+            {
+              enableHighAccuracy: true,
+              maximumAge: 0,
+              timeout: 10000
+            }
+          );
+        },
+        function(error) {
+          console.error("Error getting current geolocation:", error.message);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 10000
+        }
+      );
+    }
+
+    // Function to calculate distance between two points (Haversine formula)
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371; // Radius of the earth in kilometers
+      const dLat = deg2rad(lat2 - lat1);
+      const dLon = deg2rad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const d = R * c; // Distance in km
+      return d;
+    }
+
+    function deg2rad(deg) {
+      return deg * (Math.PI / 180);
+    }
+
+    // Function to display distance information
+    function displayDistance(location, distance) {
+      let distanceInfo = document.getElementById("distanceInfo");
+
+      // Create a span element for each location's distance if it doesn't exist
+      let locationDistanceSpan = distanceInfo.querySelector(`#distance-${location.name}`);
+      if (!locationDistanceSpan) {
+        locationDistanceSpan = document.createElement('span');
+        locationDistanceSpan.id = `distance-${location.name}`;
+        distanceInfo.appendChild(locationDistanceSpan);
+      }
+
+      // Update the distance text for this location
+      locationDistanceSpan.innerHTML = `${location.name} is ${distance.toFixed(2)} km from your current location.<br>`;
+    }
+
+    // Function to play audio
+    function playAudio(audioSrc) {
+      audio.src = audioSrc;
+      audio.play();
+    }
+
+    // Function to stop audio
+    function stopAudio() {
+      audio.pause();
+      audio.currentTime = 0; // Reset audio playback position
+    }
+
+    // Event listeners for buttons
+    document.getElementById("startTrackingBtn").addEventListener("click", function() {
+      initializeMap();
+    });
+
+    document.getElementById("stopTrackingBtn").addEventListener("click", function() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        console.log("Location tracking stopped.");
+        // Clear latitude and longitude elements
+        document.getElementById("latitude").textContent = "";
+        document.getElementById("longitude").textContent = "";
+        // Clear distance information
+        document.getElementById("distanceInfo").innerHTML = "";
+        audioPlayed = false; // Reset audio played flag
+        stopAudio(); // Stop audio playback
+        watchId = null; // Reset watchId
+        // Remove marker from map
+        if (marker !== null) {
+          map.removeLayer(marker);
+          marker = null;
+        }
+        // Remove pathways (polylines) from map
+        pathways.forEach(pathway => {
+          map.removeLayer(pathway);
+        });
+        pathways = []; // Clear pathways array
+      } else {
+        console.log("No active watch to clear.");
+      }
+    });
+  </script>
+
+</body>
+</html>

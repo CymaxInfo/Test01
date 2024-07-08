@@ -1,0 +1,106 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    font-family: Arial, sans-serif;
+  }
+  
+  nav {
+    background-color: #333;
+    color: white;
+    padding: 10px;
+  }
+  
+  nav h2 {
+    margin: 0;
+    font-size: 1.5em;
+  }
+  
+  nav ul {
+    list-style-type: none;
+  }
+  
+  nav ul li {
+    display: inline;
+    margin-right: 10px;
+  }
+  
+  h1 {
+    text-align: center;
+  }
+  
+  .progress {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #ccc;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    position: relative;
+    cursor: pointer;
+  }
+  
+  .progress::after {
+    content: "";
+    position: absolute;
+    width: 125px;
+    height: 5px;
+    background-color: #ccc;
+    right: 30px;
+  }
+  
+  .step {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .step .icon {
+    font-size: 35px;
+    color: #ff4732;
+    margin: 0 60px;
+  }
+  
+  .step .text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ff4732;
+  }
+  
+  .step p {
+    margin: 5px 0;
+  }
+  
+  /* Active state */
+  .step.active .progress {
+    background-color: #ff4732;
+  }
+  
+  .step.active .progress::after {
+    background-color: #ff4732;
+  }
+  
+  .step.active .text {
+    color: #ff4732;
+  }
+  
+  /* Responsive */
+  @media (max-width: 768px) {
+    .progress::after {
+      width: 0;
+      height: 0;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .step .icon {
+      margin: 0 30px;
+    }
+  }
+  
