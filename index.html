@@ -248,10 +248,24 @@
     }
 
     // Function to play audio
-    function playAudio(audioSrc) {
-      audio.src = audioSrc;
-      audio.play();
-    }
+  // Function to play audio
+function playAudio(audioSrc) {
+  audio.src = audioSrc;
+  
+  // Check if the audio can be played (browser-specific requirement)
+  let playPromise = audio.play();
+  
+  if (playPromise !== undefined) {
+    playPromise.then(_ => {
+      // Automatic playback started!
+      console.log('Audio playback started.');
+    }).catch(error => {
+      // Auto-play was prevented
+      console.error('Auto-play prevented. Please interact with the page to play audio:', error);
+    });
+  }
+}
+
 
     // Function to stop audio
     function stopAudio() {
