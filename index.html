@@ -35,10 +35,10 @@
     let targetLocations = [
       { name: "A", latitude: 17.430652848129057,  longitude: 78.45563205973157, audio: "TEST01.mp3" },
       { name: "B", latitude: 17.42920742246082, longitude: 78.45539066206804, audio: "TEST02.mp3" },
-      { name: "C", latitude: 17.43397925537426, longitude: 78.44867913520096, audio: "TEST01.mp3" }
+      { name: "C", latitude: 17.43586977362672, longitude: 78.45345717606331,  audio: "TEST03.mp3" }
       // Add more target locations as needed
     ];
-    let proximityThreshold = 0.02; // Threshold in kilometers (20 meters)
+    let proximityThreshold = 0.05; // Threshold in kilometers (50 meters)
     let audioPlayed = false; // Flag to track if audio has been played
     let audio = document.getElementById("audioPlayer");
 
@@ -53,6 +53,7 @@
     // Marker variable
     let marker = null;
     let pathways = []; // Array to store pathways (polylines)
+    let traveledPath = null; // Variable to hold the traveled path (polyline)
 
     // Function to initialize the map centered on the user's current location
     function initializeMap() {
@@ -121,9 +122,11 @@
             // Display initial distance information
             displayDistance(location, distance);
 
-            // Draw pathway (polyline) from current location to target location
-            let pathway = L.polyline([[currentLat, currentLng], [location.latitude, location.longitude]], { color: 'blue' }).addTo(map);
-            pathways.push(pathway);
+            // Draw route (polyline) from current location to target location
+            calculateRoute(currentLat, currentLng, location.latitude, location.longitude, function(route) {
+              let pathway = L.polyline(route, { color: 'blue' }).addTo(map);
+              pathways.push(pathway);
+            });
           });
 
           // Update latitude and longitude elements with current position
@@ -158,9 +161,20 @@
                 // Display updated distance information
                 displayDistance(location, distance);
 
-                // Update pathway (polyline) to reflect current location
-                let pathway = pathways[index];
-                pathway.setLatLngs([[updatedLat, updatedLng], [location.latitude, location.longitude]]);
+                // Update route (polyline) to reflect current location
+                calculateRoute(updatedLat, updatedLng, location.latitude, location.longitude, function(route) {
+                  if (index === 0) {
+                    // Update the traveled path for the first target location
+                    if (traveledPath) {
+                      map.removeLayer(traveledPath);
+                    }
+                    traveledPath = L.polyline(route, { color: 'green' }).addTo(map);
+                  } else {
+                    // Update the route to the target location
+                    let pathway = pathways[index];
+                    pathway.setLatLngs(route);
+                  }
+                });
               });
             },
             function(error) {
@@ -200,6 +214,21 @@
 
     function deg2rad(deg) {
       return deg * (Math.PI / 180);
+    }
+
+    // Function to calculate route between two points
+    function calculateRoute(startLat, startLng, endLat, endLng, callback) {
+      // Using OpenRouteService API to calculate route
+      let url = `https://api.openrouteservice.org/v2/directions/driving-car?start=${startLng},${startLat}&end=${endLng},${endLat}&api_key=5b3ce3597851110001cf62489bf0b47e625d4a7ca265bbaf18c24a31`;
+
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          // Extract coordinates from the response
+          let coordinates = data.features[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+          callback(coordinates);
+        })
+        .catch(error => console.error('Error fetching route:', error));
     }
 
     // Function to display distance information
@@ -257,6 +286,11 @@
           map.removeLayer(pathway);
         });
         pathways = []; // Clear pathways array
+        // Remove traveled path from map
+        if (traveledPath !== null) {
+          map.removeLayer(traveledPath);
+          traveledPath = null;
+        }
       } else {
         console.log("No active watch to clear.");
       }
